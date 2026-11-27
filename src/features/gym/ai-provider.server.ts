@@ -398,3 +398,73 @@ export function extractJson(text: string): unknown {
     throw new AiError("The AI returned a plan I couldn't read — please try again.");
   }
 }
+
+// ---- Embeddings (used by the Languages library) -------------------------------------------------------------------
+//   AI_EMBED_MODEL  optional for gemini (default gemini-embedding-001), required for openai-compatible.
+// The same AI_PROVIDER, AI_BASE_URL and AI_API_KEY as the chat are used. Vectors are asked for at EMBED_DIMS
+// dimensions: that number is also written in migration 0013 (vector(768)), so change both together.
+
+export const EMBED_DIMS = 768;
+const GEMINI_EMBED_MODEL = "gemini-embedding-001";
+const EMBED_ATTEMPTS = 4;
+
+function embedConfig(): { url: string; model: string; apiKey: string } {
+  const provider = (process.env["AI_PROVIDER"] ?? "gemini").trim().toLowerCase();
+  const apiKey = process.env["AI_API_KEY"]?.trim();
+  if (!apiKey) throw new AiError("The AI assistant isn't set up yet (AI_API_KEY is missing).");
+  const model = process.env["AI_EMBED_MODEL"]?.trim() || (provider === "gemini" ? GEMINI_EMBED_MODEL : "");
+  let baseUrl: string | undefined;
+  if (provider === "gemini") baseUrl = process.env["AI_BASE_URL"]?.trim() || GEMINI_BASE_URL;
+  else if (provider === "openai-compatible") baseUrl = process.env["AI_BASE_URL"]?.trim();
+  else throw new AiError(`AI_PROVIDER "${provider}" cannot make embeddings. Use gemini or openai-compatible.`);
+  if (!baseUrl || !model) throw new AiError("AI_BASE_URL and AI_EMBED_MODEL are required for embeddings when AI_PROVIDER=openai-compatible.");
+  return { url: `${baseUrl.replace(/\/+$/, "")}/embeddings`, model, apiKey };
+}
+
+/**
+ * Turns texts into vectors of EMBED_DIMS numbers, in the same order. Rate limits, overload and network errors are
+ * retried with a growing wait; anything else throws an AiError that says what happened. Never logs the key.
+ */
+export async function embed(texts: readonly string[]): Promise<number[][]> {
+  if (!texts.length) return [];
+  const { url, model, apiKey } = embedConfig();
+  const base = envMs("AI_RETRY_BASE_MS", 1000);
+  let failure: Failure | null = null;
+  for (let n = 1; n <= EMBED_ATTEMPTS; n++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), envMs("AI_TIMEOUT_MS", 60_000));
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model, input: texts, dimensions: EMBED_DIMS }),
+        signal: controller.signal,
+      });
+      if (res.ok) return parseEmbeddings((await res.json().catch(() => null)) as unknown, texts.length);
+      failure = classifyFailure(res.status, (await res.text().catch(() => "")).slice(0, 800), res.headers.get("retry-after"));
+    } catch (e) {
+      if (e instanceof AiError) throw e;
+      const timedOut = controller.signal.aborted;
+      failure = { kind: timedOut ? "timeout" : "network", status: null, retryAfterMs: null, detail: timedOut ? "no answer in time" : String(e).slice(0, 200) };
+    } finally {
+      clearTimeout(timer);
+    }
+    console.error(`AI embeddings error: model=${model} attempt=${n} kind=${failure.kind} status=${failure.status ?? "none"} ${failure.detail}`);
+    if (failure.kind === "auth" || !RETRYABLE.has(failure.kind) || n === EMBED_ATTEMPTS) break;
+    await sleep(Math.min(MAX_WAIT_MS, failure.retryAfterMs ?? base * 2 ** (n - 1)) + Math.random() * base * 0.2);
+  }
+  throw new AiError(describeFailure(failure!, model));
+}
+
+/** Checks the provider's answer: one vector per input, each EMBED_DIMS long, in input order. Exported for tests. */
+export function parseEmbeddings(json: unknown, expected: number): number[][] {
+  const data = (json as { data?: { index?: number; embedding?: unknown }[] } | null)?.data;
+  if (!Array.isArray(data) || data.length !== expected) throw new AiError("The AI service sent an unreadable embedding reply — please try again.");
+  const ordered = [...data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  return ordered.map((d) => {
+    const v = d.embedding;
+    if (!Array.isArray(v) || v.some((x) => typeof x !== "number" || !Number.isFinite(x))) throw new AiError("The AI service sent an unreadable embedding reply — please try again.");
+    if (v.length !== EMBED_DIMS) throw new AiError(`The embedding model returned ${v.length} numbers per text, but the library needs ${EMBED_DIMS}. Use another AI_EMBED_MODEL.`);
+    return v as number[];
+  });
+}

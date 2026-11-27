@@ -565,6 +565,82 @@ export type Database = {
         }
         Relationships: []
       }
+      language_chunks: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          fts: unknown
+          id: string
+          kind: string
+          page: number | null
+          section: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          kind?: string
+          page?: number | null
+          section?: string | null
+          source: string
+          user_id?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          kind?: string
+          page?: number | null
+          section?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vocab_words: {
+        Row: {
+          article: string | null
+          box: number
+          created_at: string
+          due: string
+          english: string
+          example: string | null
+          german: string
+          id: string
+          plural: string | null
+          user_id: string
+        }
+        Insert: {
+          article?: string | null
+          box?: number
+          created_at?: string
+          due?: string
+          english: string
+          example?: string | null
+          german: string
+          id?: string
+          plural?: string | null
+          user_id?: string
+        }
+        Update: {
+          article?: string | null
+          box?: number
+          created_at?: string
+          due?: string
+          english?: string
+          example?: string | null
+          german?: string
+          id?: string
+          plural?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pantry_settings: {
         Row: {
           ai_check: boolean
@@ -744,6 +820,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      search_language: {
+        Args: {
+          match_count?: number
+          query_embedding?: string | null
+          query_text?: string
+        }
+        Returns: {
+          content: string
+          id: string
+          kind: string
+          page: number | null
+          score: number
+          section: string | null
+          similarity: number | null
+          source: string
+        }[]
+      }
       cook_recipe: {
         Args: {
           p_carbs_g?: number | null

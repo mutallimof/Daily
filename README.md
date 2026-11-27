@@ -7,6 +7,7 @@ A personal planner for training and food. It started as a gym planner and grew a
 - **Training:** sessions with sets, reps and weight, an exercise library (38 seeded, about 850 more with the optional import), workout logging with progress charts, week and month views, a body-weight log.
 - **Pantry:** items by place with expiry markers, receipt import (paste, PDF, HTML, or a photo read in your browser), a product dictionary that learns from your corrections, and a kitchen view to browse it.
 - **Cooking:** recipes with rough calories and protein, what you can cook from what you have, and used food is removed when you cook.
+- **Languages (optional):** ask questions about your own German word lists and notes; answers cite the page or section they came from. It searches by meaning and by keyword, and it needs your own API key. See `docs/languages.md`.
 - **AI chat (optional):** adds, swaps and schedules sessions, and helps with cooking. It needs your own API key.
 - Installs on a phone as a PWA, with an offline copy of the plan.
 
@@ -48,6 +49,8 @@ Vercel or Cloudflare Pages. Steps and the environment variables are in `DEPLOY.m
 | `npm run build` | production build |
 | `npm test` | tests |
 | `npm run lint` | lint |
+| `npm run languages:ingest -- "<folder>"` | load word lists and notes into your Languages library |
+| `npm run languages:eval` | measure the library search on 25 questions |
 
 ## Layout
 
@@ -56,6 +59,7 @@ Vercel or Cloudflare Pages. Steps and the environment variables are in `DEPLOY.m
 - `src/features/pantry/`: items, dictionary, receipts, OCR
 - `src/features/cook/`: recipes and nutrition
 - `src/features/kitchen/`: the kitchen view
+- `src/features/languages/`: the German library: chunking, search, cited answers
 - `setup.sql`, `migrations/`: database
 - `docs/features.md`: notes on the pantry, receipts, OCR and the exercise import
 

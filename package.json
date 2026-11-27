@@ -12,7 +12,9 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ocr:eval": "tsx scripts/ocr-eval/run.ts"
+    "ocr:eval": "tsx scripts/ocr-eval/run.ts",
+    "languages:ingest": "tsx --env-file=.env scripts/languages/ingest.ts",
+    "languages:eval": "tsx --env-file=.env scripts/languages/eval.ts"
   },
   "overrides": {
     "rolldown": "1.2.1"
